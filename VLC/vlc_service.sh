@@ -53,6 +53,7 @@ elif [ "monitor" == "$param" ] ; then
   if isdirectory "/proc/$PID"; then
     exit 0;
   else
+    python /opt/videos/vlc_vidstream stop
     exit 7;
   fi
 elif [ "meta-data" == "$param" ] ; then
