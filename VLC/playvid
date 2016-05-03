@@ -1,0 +1,4 @@
+#!/bin/bash
+eval $1 &
+echo "pid was $(($!+3))"
+echo $(($!+3)) > /tmp/vlc_service.pid 

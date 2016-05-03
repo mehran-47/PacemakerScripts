@@ -1,0 +1,37 @@
+#!/usr/bin/env python
+import sys, json, os
+from subprocess import call
+from shlex import split 
+
+class VidStreamService():
+	def __init__(self, configFile):
+		with open(configFile, 'r') as f: config = json.loads(f.read())
+		self.ip = config['ip']
+		self.port = config['port']
+		self.dev = config['dev']
+		self.video = config['video_path']
+		self.user = config['user']
+
+	def start(self):	
+		call(split('ip addr add '+ self.ip + ' dev ' + self.dev))
+		execString = "su "+ self.user +" -c \"vlc -vvv "+ self.video +" --sout '#rtp{sdp=rtsp://"+ self.ip.split('/')[0] + ":" + str(self.port) +"/test}' --loop --ttl 1 --daemon\""
+		call(['/opt/videos/playvid', execString])
+
+	def stop(self):
+		#with open('/tmp/vlc_service.pid', 'r') as pf: pid = str(int(pf.read())+3)
+		with open('/tmp/vlc_service.pid', 'r') as pf: pid = pf.read()
+		call(split('kill -9 '+pid))
+		call(split('ip addr del '+ self.ip + ' dev ' + self.dev))
+
+	def status(self):
+		#with open('/tmp/vlc_service.pid', 'r') as pf: pid = str(int(pf.read())+3)
+		with open('/tmp/vlc_service.pid', 'r') as pf: pid = pf.read().strip()
+		if os.path.isdir('/proc/'+pid): 
+			print('VLC video streaming service is running.\nPID %s' %(pid))
+		else:
+			print('VLC video streaming service is not running')
+
+if __name__ == '__main__':
+	vs = VidStreamService('/opt/videos/vlc_service_config.json')
+	actionMap = {'start':vs.start , 'stop':vs.stop, 'status':vs.status}
+	if sys.argv[1:] and sys.argv[1] in actionMap: actionMap[sys.argv[1]]()

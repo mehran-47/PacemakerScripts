@@ -1,0 +1,7 @@
+{
+	"ip":"192.168.189.200/32",
+	"port":5544,
+	"dev":"eth0",
+	"user":"magic",
+	"video_path":"/opt/videos/kurzgezagt_safe_and_sorry.mp4"
+}
