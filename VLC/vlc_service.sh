@@ -1,7 +1,8 @@
 #!/bin/bash
 
 param=$1
-
+PID_EXISTS=true
+CALL_COUNT=0
 #export DO_TOKEN=$OCF_RESKEY_do_token
 #IP=$OCF_RESKEY_floating_ip
 #ID=$(curl -s http://169.254.169.254/metadata/v1/id)
@@ -21,8 +22,7 @@ vlc ocf resource agent for streaming a specified video to a specified IP</longde
   <actions>
     <action name="start"        timeout="20" />
     <action name="stop"         timeout="20" />
-    <action name="monitor"      timeout="20"
-                                interval="10" depth="0" />
+    <action name="monitor"      timeout="10" interval="5" depth="0" />
     <action name="meta-data"    timeout="5" />
   </actions>
 </resource-agent>
@@ -40,6 +40,21 @@ isdirectory() {
   fi
 }
 
+monitor(){
+  CALL_COUNT=cat "/opt/videos/call_count"
+  if [ $CALL_COUNT -gt 2 ]; then
+    if [ -e "/proc/$(cat /tmp/vlc_service.pid)" ]; then
+      echo "/proc/$(cat /tmp/vlc_service.pid)" > /opt/videos/status
+      PID_EXISTS=true
+    else
+      PID_EXISTS=false
+    fi
+  else
+    CALL_COUNT=$(($CALL_COUNT+1))
+  fi
+  echo $CALL_COUNT > /opt/videos/call_count
+}
+
 if [ "start" == "$param" ] ; then
   python /opt/videos/vlc_vidstream start
   exit 0
@@ -49,11 +64,11 @@ elif [ "stop" == "$param" ] ; then
 elif [ "status" == "$param" ] ; then
   python /opt/videos/vlc_vidstream status
 elif [ "monitor" == "$param" ] ; then
-  PID=$(cat /tmp/vlc_service.pid);
-  if isdirectory "/proc/$PID"; then
+  #PID=$(cat /tmp/vlc_service.pid);
+  python /opt/videos/vlc_vidstream monitor &
+  if $PID_EXISTS; then
     exit 0;
   else
-    python /opt/videos/vlc_vidstream stop
     exit 7;
   fi
 elif [ "meta-data" == "$param" ] ; then

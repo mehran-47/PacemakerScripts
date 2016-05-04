@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import sys, json, os
-from subprocess import call
+import sys, json, os, time
+from subprocess import call, Popen, PIPE
 from shlex import split 
 
 class VidStreamService():
@@ -15,13 +15,21 @@ class VidStreamService():
 	def start(self):	
 		call(split('ip addr add '+ self.ip + ' dev ' + self.dev))
 		execString = "su "+ self.user +" -c \"vlc -vvv "+ self.video +" --sout '#rtp{sdp=rtsp://"+ self.ip.split('/')[0] + ":" + str(self.port) +"/test}' --loop --ttl 1 --daemon\""
-		call(['/opt/videos/playvid', execString])
+		#call(['/opt/videos/playvid', execString])
+		call(split(execString))
+		try:
+			pid=Popen(['pidof', 'vlc'], stdout=PIPE).communicate()[0].split('\n')[-2].split(' ')[-1]
+		except IndexError:
+			pid=-1
+		with open('/tmp/vlc_service.pid', 'w') as f: f.write(pid)
+		with open('/opt/videos/isMonitoring', 'w') as mf: mf.write('True')
 
 	def stop(self):
 		#with open('/tmp/vlc_service.pid', 'r') as pf: pid = str(int(pf.read())+3)
 		with open('/tmp/vlc_service.pid', 'r') as pf: pid = pf.read()
 		call(split('kill -9 '+pid))
 		call(split('ip addr del '+ self.ip + ' dev ' + self.dev))
+		with open('/opt/videos/isMonitoring', 'w') as mf: mf.write('False')
 
 	def status(self):
 		#with open('/tmp/vlc_service.pid', 'r') as pf: pid = str(int(pf.read())+3)
@@ -31,7 +39,19 @@ class VidStreamService():
 		else:
 			print('VLC video streaming service is not running')
 
+	def monitor(self, interval=5, toRun='True'):
+		while toRun=='True':
+			with open('/tmp/vlc_service.pid', 'r') as pf: pid = pf.read()
+			if pid>0:
+				if not os.path.exists('/proc/'+pid):
+					self.stop()
+					self.start()
+			time.sleep(interval)
+			with open('/opt/videos/isMonitoring', 'r') as mf: toRun=mf.read()
+		self.stop()		
+
+
 if __name__ == '__main__':
 	vs = VidStreamService('/opt/videos/vlc_service_config.json')
-	actionMap = {'start':vs.start , 'stop':vs.stop, 'status':vs.status}
+	actionMap = {'start':vs.start , 'stop':vs.stop, 'status':vs.status, 'monitor':vs.monitor}
 	if sys.argv[1:] and sys.argv[1] in actionMap: actionMap[sys.argv[1]]()
