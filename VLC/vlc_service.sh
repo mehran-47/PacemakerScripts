@@ -8,6 +8,17 @@ CALL_COUNT=0
 #ID=$(curl -s http://169.254.169.254/metadata/v1/id)
 #HAS_FLOATING_IP=`curl -s http://169.254.169.254/metadata/v1/floating_ip/ipv4/active`
 
+
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+#######################################################################
+
+
+
 meta_data() {
   cat <<END
 <?xml version="1.0"?>
@@ -40,7 +51,33 @@ isdirectory() {
   fi
 }
 
-monitor(){
+vlc_start() {
+  python /opt/videos/vlc_vidstream start
+  python /opt/videos/vlc_vidstream monitor &
+  return $OCF_SUCCESS
+}
+
+vlc_stop() {
+  python /opt/videos/vlc_vidstream stop
+    return $OCF_SUCCESS
+}
+
+vlc_monitor() {
+  if [[ $(pidof vlc_monitoring) ]]; then    
+    return $OCF_SUCCESS
+  else
+    python /opt/videos/vlc_vidstream monitor &    
+  fi
+
+  if [[ $(pidof vlc_monitoring) ]]; then    
+    return $OCF_SUCCESS
+  else
+    return $OCF_ERR_GENERIC
+  fi
+  return $OCF_NOT_RUNNING
+}
+
+__monitor(){
   CALL_COUNT=cat "/opt/videos/call_count"
   if [ $CALL_COUNT -gt 2 ]; then
     if [ -e "/proc/$(cat /tmp/vlc_service.pid)" ]; then
@@ -56,21 +93,26 @@ monitor(){
 }
 
 if [ "start" == "$param" ] ; then
-  python /opt/videos/vlc_vidstream start
-  exit 0
+  #python /opt/videos/vlc_vidstream start &
+  #exit 0
+  vlc_start
 elif [ "stop" == "$param" ] ; then
-  python /opt/videos/vlc_vidstream stop
-  exit 0;
+  #python /opt/videos/vlc_vidstream stop
+  #exit 0;
+  vlc_stop
 elif [ "status" == "$param" ] ; then
   python /opt/videos/vlc_vidstream status
 elif [ "monitor" == "$param" ] ; then
+  vlc_monitor
   #PID=$(cat /tmp/vlc_service.pid);
+  : '
   python /opt/videos/vlc_vidstream monitor &
   if $PID_EXISTS; then
     exit 0;
   else
     exit 7;
   fi
+  '
 elif [ "meta-data" == "$param" ] ; then
   meta_data
   exit 0
