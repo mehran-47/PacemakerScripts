@@ -10,3 +10,6 @@ corosync-cmapctl | grep members
 *start/stop resource
 crm resource start <resource name>
 crm resource stop <resource name>
+
+*show configuration
+crm configure show

@@ -12,7 +12,6 @@ class VidStreamService():
 		self.video = config['video_path']
 		self.user = config['user']
 
-
 	def __check_n_get_vlc_pid(self):
 		try:
 			pid=Popen(['pidof', 'vlc'], stdout=PIPE).communicate()[0].split('\n')[-2].split(' ')[-1]
@@ -28,8 +27,7 @@ class VidStreamService():
 			call(split(execString))
 			pid = self.__check_n_get_vlc_pid()
 		with open('/tmp/vlc_service.pid', 'w') as f: f.write(pid)
-		with open('/opt/videos/isMonitoring', 'w') as mf: mf.write('True')
-		spt.setproctitle('vlc_monitoring')
+		with open('/opt/videos/isMonitoring', 'w') as mf: mf.write('True')		
 
 	
 	def stop(self):
@@ -53,6 +51,7 @@ class VidStreamService():
 
 	def monitor(self, interval=2, toRun='True'):
 		if not Popen(['pidof','vlc_monitoring'], stdout=PIPE).communicate()[0]:
+			spt.setproctitle('vlc_monitoring')
 			while toRun=='True':
 				if os.path.exists('/tmp/vlc_service.pid'):
 					with open('/tmp/vlc_service.pid', 'r') as pf: pid = pf.read()
