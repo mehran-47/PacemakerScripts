@@ -1,0 +1,4 @@
+#Common case
+vlc -vvv Paint_on_a_Drum_in_4K_Slow_Mo_-_The_Slow_Mo_Guys.mp4 --sout '#rtp{sdp=rtsp://192.168.31.1:8080/rtest}' --loop --ttl 1 --daemon
+#With remote control
+vlc -vvv Paint_on_a_Drum_in_4K_Slow_Mo_-_The_Slow_Mo_Guys.mp4 --sout '#rtp{sdp=rtsp://192.168.31.1:8080/rtest}' --loop --ttl 1 -I rc
