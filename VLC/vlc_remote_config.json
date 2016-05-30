@@ -1,0 +1,19 @@
+{
+	"video_config":{
+		"ip":"192.168.189.200/24",
+		"port":5544,
+		"dev":"eth0",
+		"user":"magic",
+		"path":"/opt/videos/kurzgezagt_safe_and_sorry.mp4"
+	},
+	"checkpoint_config":{
+		"server":{
+			"ip":"192.168.189.129",
+			"port":6666
+		},
+		"client":{
+			"ip":"192.168.189.129",
+			"port":5555	
+		}
+	}
+}
