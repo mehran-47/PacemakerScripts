@@ -4,26 +4,27 @@ import socket
 import sys
 import os
 import pickle
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Event
 
 class connection():
-	def __init__(self, host, port, **kwargs):
+	def __init__(self, host, port, shouldRun, **kwargs):
 		self.debug = kwargs["debug"] if "debug" in kwargs else False
 		self.stopafter = kwargs["stopafter"] if "stopafter" in kwargs else None
 		self.host = host
 		self.port = port
+		self.shouldRun = Event()
+		self.shouldRun = shouldRun
 		self.thread_from = None
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		if self.debug:
 			print('Server socket created')
 
-
 	def __decoder(self, conn, child_pipe):
 		fdict = {}
 		try:
-			while True:
+			while self.shouldRun.is_set():
 				data = conn.recv(2048)
-				if not data:
+				if not data or not self.shouldRun.is_set():
 					if self.debug:
 						print('Connected thread ending from %r' %(self.thread_from))
 						child_pipe.send({'msg':'END_OF_Q'})
@@ -34,10 +35,11 @@ class connection():
 				self.thread_from = fdict.get('from')
 				child_pipe.send(fdict)
 				#string_received = data.decode(encoding='UTF-8')
+			print('out of __decoder')
 		except KeyboardInterrupt:
 			conn.close()			
 		finally:
-			self.socket.close()
+			conn.close()
 
 	def listen(self, child_pipe):
 		msg = ''
@@ -56,7 +58,7 @@ class connection():
 		if self.debug:
 			print('Socket now listening')
 
-		while True:
+		while self.shouldRun.is_set():
 			try:
 				conn, addr = self.socket.accept()
 				print('Connected with ' + addr[0] + ':' + str(addr[1]))
@@ -70,7 +72,13 @@ class connection():
 						self.socket.close()
 					break
 				else:
-					break	
+					break
+		print('out of listen')
+		if writer_proc is not None:
+			if writer_proc.is_alive():
+				writer_proc.join()
+		self.socket.close()
+		print("\nStopping server.")
 
 
 	def connect(self, serverip, serverport):
