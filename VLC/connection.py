@@ -70,9 +70,7 @@ class connection():
 						self.socket.close()
 					break
 				else:
-					break
-			finally:
-				self.socket.close()		
+					break	
 
 
 	def connect(self, serverip, serverport):
