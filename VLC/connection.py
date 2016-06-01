@@ -35,7 +35,6 @@ class connection():
 				self.thread_from = fdict.get('from')
 				child_pipe.send(fdict)
 				#string_received = data.decode(encoding='UTF-8')
-			print('out of __decoder')
 		except KeyboardInterrupt:
 			conn.close()			
 		finally:
@@ -73,12 +72,11 @@ class connection():
 					break
 				else:
 					break
-		print('out of listen')
 		if writer_proc is not None:
 			if writer_proc.is_alive():
 				writer_proc.join()
 		self.socket.close()
-		print("\nStopping server.")
+		print("\nStopping TCP server.")
 
 
 	def connect(self, serverip, serverport):

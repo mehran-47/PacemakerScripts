@@ -1,33 +1,34 @@
 #!/usr/bin/env python
 from connection import *
-import logging as lg, sys
+import logging as lg, sys, json
 from multiprocessing import Event 
 
-def terminate_server_gracefully(ip, port, ev=Event()):
+def terminate_server_gracefully(config, ev=Event()):
 	time.sleep(5)
 	ev.set()
 	try:
-		client = connection('192.168.189.129', 5555, ev)
-		client.connect(ip, port)
+		client = connection(config['client']['ip'], config['client']['port'], ev)
+		client.connect(config['server']['ip'], config['server']['port'])
 	except socket.error:
 		lg.info('caught bad file descriptor exception')
 		client.close()
 
 
 if __name__ == '__main__':
-	if sys.argv[1:]:
+	if sys.argv[2:]:
 		shouldRun = Event()
 		shouldRun.set()
-		client = connection('192.168.189.129', 5555, shouldRun)
-		client.connect('192.168.189.129', 6666)
+		with open(sys.argv[1], 'r') as cf: config = json.loads(cf.read())['vlc_client']
+		client = connection(config['client']['ip'], config['client']['port'], shouldRun)
+		client.connect(config['server']['ip'], config['server']['port'])
 		lg.basicConfig(level=lg.DEBUG)
-		msg = {'message':sys.argv[1].strip()}
+		msg = {'message':sys.argv[2].strip()}
 		lg.info(msg)
 		time.sleep(1)
 		client.send(msg)
 		client.close()
 		if msg.get('message')=='terminate':
-			terminate_server_gracefully('192.168.189.129', 6666)
+			terminate_server_gracefully(config)
 		'''
 		while True:
 			try:

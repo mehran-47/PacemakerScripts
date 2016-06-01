@@ -9,11 +9,32 @@
 	"checkpoint_config":{
 		"server":{
 			"ip":"192.168.189.129",
+			"port":6677
+		},
+		"client":{
+			"ip":"192.168.189.129",
+			"port":5566	
+		},
+		"interval":5
+	},
+	"rc_handle":{
+		"server":{
+			"ip":"192.168.189.129",
 			"port":6666
 		},
 		"client":{
 			"ip":"192.168.189.129",
 			"port":5555	
+		}
+	},
+	"vlc_client":{
+		"server":{
+			"ip":"192.168.189.129",
+			"port":6000
+		},
+		"client":{
+			"ip":"192.168.189.129",
+			"port":5000	
 		}
 	}
 }

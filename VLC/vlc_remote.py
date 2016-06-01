@@ -4,6 +4,7 @@ from threading import Thread, Event as ThreadEvent
 import sys, os, logging as lg, time, json
 from multiprocessing import Pipe, Process, Queue, Event as ProcessEvent
 from connection import *
+from checkpoint_service import *
 
 class vlcRemoteColtroller():
 	def __init__(self, multiQ, runThreads, runProcs):		
@@ -45,18 +46,41 @@ class vlcRemoteColtroller():
 					self.check_new_commands.clear()
 					self.listen_for_commands.clear()
 					lg.info('Stopping vlc remote.')
+				elif aCommand.strip()=='get_time':
+					lg.debug("current time: %s" %(self.get_time()))
+				elif aCommand.strip().split(' ')[0]=='seek':
+					self.resume_at(aCommand.strip().split(' ')[1])
 				else:
 					self.handle.sendline(aCommand)
 				#if aCommand.split(',')[0]=='seek'
 			time.sleep(self.interval)
 		lg.info('Stopping live command input')
 
+	def is_playing(self):
+		self.handle.sendline('is_playing')
+		#repeated intentionally as the output tails the input by 1 command
+		self.handle.sendline('is_playing')
+		return int(self.last10Lines[-1].split('\\')[0].strip())==0
 
 	def get_time(self):
-		pass
+		self.handle.sendline('get_time')
+		#repeated intentionally as the output tails the input by 1 command
+		self.handle.sendline('get_time')
+		return self.last10Lines[-1].split('\\')[0].strip()
+
+	def resume_at(self, resumeTime):
+		lg.debug('command to resume at time : %s' %(resumeTime))
+		if not self.is_playing():
+			self.handle.sendline('play')
+		self.handle.sendline('seek '+resumeTime)
+
+	def checkpoint_enqueue(self, checkpointingQ, interval=5):
+		while self.check_new_commands.is_set():
+			checkpointingQ.put(self.get_time())
+			time.sleep(interval)
 
 
-def server_recv(child_pipe, multiQ, serverConn, runProcs):
+def server_recv_commands (child_pipe, multiQ, serverConn, runProcs):
 	try:
 		while runProcs.is_set():
 			data = child_pipe.recv()
@@ -72,30 +96,36 @@ def server_recv(child_pipe, multiQ, serverConn, runProcs):
 		lg.info('Stopping checkpoint server')
 
 
-def start_remote_vlc(configfile):
+def start_remote_vlc_service(configfile):
 	with open(configfile, 'r') as cf: config = json.loads(cf.read())
 	lg.basicConfig(level=lg.DEBUG)
 	multiQ = Queue()
+	checkpointingQ = Queue()
 	runThreads = ThreadEvent()
 	runProcs = ProcessEvent()
 	runThreads.set()
 	runProcs.set()
-	server = connection(config['checkpoint_config']['server']['ip'], config['checkpoint_config']['server']['port'], runProcs)
+	server = connection(config['vlc_client']['server']['ip'], config['vlc_client']['server']['port'], runProcs)
 	parent_pipe, child_pipe = Pipe()
 	#Start server process *before* starting remote control thread
-	serverProcess = Process(target=server_recv, args=(child_pipe, multiQ, server, runProcs))
+	serverProcess = Process(target=server_recv_commands , args=(child_pipe, multiQ, server, runProcs))
 	serverProcess.start()
-	lg.info('Listening on %r:%r' %(config['checkpoint_config']['server']['ip'], config['checkpoint_config']['server']['port']))
+	lg.info('Listening on %r:%r' %(config['vlc_client']['server']['ip'], config['vlc_client']['server']['port']))
 	vc = vlcRemoteColtroller(multiQ, runThreads, runProcs)
 	vcThread = Thread(target=vc.instantiate, args=(config['video_config']['path'], config['video_config']['ip'].split('/')[0], config['video_config']['port'], True))
 	vcThread.start()
+	ckpt = checkpoint(config['checkpoint_config'], runProcs)
+	ckptConsumerProcess = Process(target=ckpt.checkpoint, args=(checkpointingQ,))
+	ckptProviderThread = Thread(target=vc.checkpoint_enqueue, args=(checkpointingQ,))
+	ckptProviderThread.start()
+	ckptConsumerProcess.start()
 	server.listen(parent_pipe)
 	runProcs.clear()
 	runThreads.clear()
 
 if __name__ == '__main__':
 	if sys.argv[1:]:
-		start_remote_vlc(sys.argv[1])
+		start_remote_vlc_service(sys.argv[1])
 	else:
 		lg.error('No config file provided.\nUsage: %s <config_file>.json' %(sys.argv[0]))
 
