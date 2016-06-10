@@ -7,15 +7,17 @@ from connection import *
 from checkpoint_service import *
 
 class vlcRemoteColtroller():
-	def __init__(self, multiQ, runThreads, runProcs):		
+	def __init__(self, multiQ, checkpointHandle ,runThreads, runProcs):		
 		self.handle = spawn('bash', timeout=None)
 		self.check_new_commands = runThreads
 		self.listen_for_commands = runProcs
+		self.isFirstCall = True
 		self.commandstack = multiQ
 		self.interval = 2
 		self.last10Lines = []
 		self.commands_executer = Thread(target=self.command_executer, args=(multiQ,))
 		self.commands_executer.start()
+		self.ckpt = checkpointHandle
 
 	def instantiate(self, user, path_to_video, ip, port, play=False):
 		if os.path.exists(path_to_video):
@@ -50,6 +52,10 @@ class vlcRemoteColtroller():
 					lg.debug("current time: %s" %(self.get_time()))
 				elif aCommand.strip().split(' ')[0]=='seek':
 					self.resume_at(aCommand.strip().split(' ')[1])
+				elif aCommand.strip().split(' ')[0]=='resume':
+					lastCkpt = self.ckpt.getLatestCheckPoint()
+					lg.debug('resuming from %s' %(lastCkpt))
+					self.resume_at(lastCkpt)
 				else:
 					self.handle.sendline(aCommand)
 				#if aCommand.split(',')[0]=='seek'
@@ -70,13 +76,19 @@ class vlcRemoteColtroller():
 
 	def resume_at(self, resumeTime):
 		lg.debug('command to resume at time : %s' %(resumeTime))
+		'''
 		if not self.is_playing():
 			self.handle.sendline('play')
-		self.handle.sendline('seek '+resumeTime)
+		'''
+		self.handle.sendline('play')
+		self.handle.sendline('seek '+ str(resumeTime))
 
 	def checkpoint_enqueue(self, checkpointingQ, interval=5):
 		while self.check_new_commands.is_set():
-			checkpointingQ.put(self.get_time())
+			lastTime = self.get_time()
+			if lastTime[0:]:
+				if lastTime[-1] in str(list(range(10))): 				
+					checkpointingQ.put(lastTime)
 			time.sleep(interval)
 
 
@@ -111,10 +123,10 @@ def start_remote_vlc_service(configfile):
 	serverProcess = Process(target=server_recv_commands , args=(child_pipe, multiQ, server, runProcs))
 	serverProcess.start()
 	lg.info('Listening on %r:%r' %(config['vlc_client']['server']['ip'], config['vlc_client']['server']['port']))
-	vc = vlcRemoteColtroller(multiQ, runThreads, runProcs)
+	ckpt = checkpoint(config['checkpoint_config'], runProcs)
+	vc = vlcRemoteColtroller(multiQ, ckpt, runThreads, runProcs)
 	vcThread = Thread(target=vc.instantiate, args=(config['user'], config['video_config']['path'], config['video_config']['ip'].split('/')[0], config['video_config']['port'], True))
 	vcThread.start()
-	ckpt = checkpoint(config['checkpoint_config'], runProcs)
 	ckptConsumerProcess = Process(target=ckpt.checkpoint, args=(checkpointingQ,))
 	ckptProviderThread = Thread(target=vc.checkpoint_enqueue, args=(checkpointingQ,))
 	ckptProviderThread.start()

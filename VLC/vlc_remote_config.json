@@ -17,7 +17,12 @@
 			"port":5566	
 		},
 		"interval":5,
-		"dir":"/opt/videos/ckpt_loc/"
+		"dir":"/opt/videos/ckpt_loc/",
+		"db":{
+			"user":"root",
+			"password":"password",
+			"db":"vlc_checkpoint"
+		}
 	},
 	"rc_handle":{
 		"server":{
