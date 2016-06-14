@@ -21,7 +21,7 @@ if __name__ == '__main__':
 		with open(sys.argv[1], 'r') as cf: config = json.loads(cf.read())['vlc_client']
 		client = connection(config['client']['ip'], config['client']['port'], shouldRun)
 		client.connect(config['server']['ip'], config['server']['port'])
-		lg.basicConfig(level=lg.DEBUG)
+		lg.basicConfig(level=lg.INFO)
 		msg = {'message':sys.argv[2].strip()}
 		lg.info(msg)
 		time.sleep(1)
