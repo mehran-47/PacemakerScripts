@@ -11,20 +11,24 @@ class vlcRemoteColtroller():
 		self.handle = spawn('bash', timeout=None)
 		self.check_new_commands = runThreads
 		self.listen_for_commands = runProcs
-		self.isFirstCall = True
 		self.commandstack = multiQ
+		self.instantiate_command = ''
 		self.interval = 2
+		self.isActive = False
 		self.last10Lines = []
-		self.commands_executer = Thread(target=self.command_executer, args=(multiQ,))
+		self.commands_executer = Thread(target=self.command_executer)
 		self.commands_executer.start()
+		self.monitorthread = Thread(target=self.monitor)
 		self.ckpt = checkpointHandle
 
-	def instantiate(self, user, path_to_video, ip, port, play=False):
-		if os.path.exists(path_to_video):
+	def instantiate(self, user, path_to_video, ip, port):
+		if os.path.exists(path_to_video):		
 			lg.debug('command to play video:')
-			self.handle.sendline('su '+ user +' -c "vlc -vvv '+ path_to_video + ' --sout \'#rtp{sdp=rtsp://' + ip + ':' + str(port) + '/rtest}\' --loop --ttl 1 -I rc"')
-			if not play: self.handle.sendline('stop')
+			self.instantiate_command = 'su '+ user +' -c "vlc -vvv '+ path_to_video + ' --sout \'#rtp{sdp=rtsp://' + ip + ':' + str(port) + '/rtest}\' --loop --ttl 1 -I rc"'
+			self.handle.sendline(self.instantiate_command)
+			if not self.isActive: self.handle.sendline('stop')
 			lg.info('vlc -vvv '+ path_to_video + ' --sout \'#rtp{sdp=rtsp://' + ip + ':' + str(port) + '/rtest}\' --loop --ttl 1 -I rc')
+			self.monitorthread.start()
 			try:
 				for line in self.handle: 
 					self.last10Lines.append(line)
@@ -37,7 +41,7 @@ class vlcRemoteColtroller():
 		else:
 			lg.error('Invalid path to video: %s' %(path_to_video))
 	
-	def command_executer(self, multiQ):
+	def command_executer(self):
 		while self.check_new_commands.is_set():
 			if not self.commandstack.empty():
 				aCommand = self.commandstack.get()
@@ -54,11 +58,14 @@ class vlcRemoteColtroller():
 					self.resume_at(aCommand.strip().split(' ')[1])
 				elif aCommand.strip().split(' ')[0]=='resume':
 					lastCkpt = self.ckpt.getLatestCheckPoint()
-					lg.debug('resuming from ' +str(lastCkpt))
+					lg.debug('command executer: resuming from ' +str(lastCkpt))
 					self.resume_at(lastCkpt)
+				elif aCommand.strip().split(' ')[0]=='set_active':
+					self.set_active()
+				elif aCommand.strip().split(' ')[0]=='set_standby':
+					self.set_standby()
 				else:
 					self.handle.sendline(aCommand)
-				#if aCommand.split(',')[0]=='seek'
 			time.sleep(self.interval)
 		lg.info('Stopping live command input')
 
@@ -68,6 +75,13 @@ class vlcRemoteColtroller():
 		self.handle.sendline('is_playing')
 		return int(self.last10Lines[-1].split('\\')[0].strip())==0 if self.last10Lines[0:] else False
 
+	def is_running(self):
+		self.handle.sendline('is_playing')
+		#repeated intentionally as the output tails the input by 1 command
+		self.handle.sendline('is_playing')
+		lg.debug('from is_running: %r' %(self.last10Lines[-1].split('\\')[0].strip()))
+		return self.last10Lines[-1].split('\\')[0].strip() in ['is_playing','0','1'] if self.last10Lines[0:] else False  
+
 	def get_time(self):
 		self.handle.sendline('get_time')
 		#repeated intentionally as the output tails the input by 1 command
@@ -75,13 +89,23 @@ class vlcRemoteColtroller():
 		return self.last10Lines[-1].split('\\')[0].strip() if self.last10Lines[0:] else ''
 
 	def resume_at(self, resumeTime):
-		lg.debug('command to resume at time : %s' %(resumeTime))
+		lg.debug('resume_at: command to resume at time : %s' %(resumeTime))
 		'''
 		if not self.is_playing():
 			self.handle.sendline('play')
 		'''
 		self.handle.sendline('play')
 		self.handle.sendline('seek '+ str(resumeTime))
+
+	def set_active(self):
+		self.isActive = True
+		lastCkpt = self.ckpt.getLatestCheckPoint()
+		lg.debug('command executer: resuming from ' +str(lastCkpt))
+		self.resume_at(lastCkpt)
+
+	def set_standby(self):
+		self.isActive = False
+		self.handle.sendline('stop')
 
 	def checkpoint_enqueue(self, checkpointingQ, interval=5):
 		while self.check_new_commands.is_set():
@@ -90,6 +114,18 @@ class vlcRemoteColtroller():
 				if lastTime[-1] in str(list(range(10))): 				
 					checkpointingQ.put(lastTime)
 			time.sleep(interval)
+
+	def monitor(self, interval=2):
+		while self.check_new_commands.is_set():
+			time.sleep(interval)
+			if not self.is_running():
+				self.handle.sendline(self.instantiate_command)
+				if self.isActive: 					
+					lastCkpt = self.ckpt.getLatestCheckPoint()
+					lg.debug('monitor: resuming from ' +str(lastCkpt))
+					self.resume_at(lastCkpt)
+				else:
+					self.handle.sendline('stop')
 
 
 def server_recv_commands (child_pipe, multiQ, serverConn, runProcs):
@@ -101,11 +137,11 @@ def server_recv_commands (child_pipe, multiQ, serverConn, runProcs):
 				if data.get('message'):
 					multiQ.put(data.get('message'))
 			time.sleep(2)
-		lg.info('Stopping network server')
+		lg.info('server_recv_commands: Stopping network server')
 		serverConn.shouldRun.clear()
 	except KeyboardInterrupt:
 		runProcs.clear()
-		lg.info('Stopping checkpoint server')
+		lg.info('server_recv_commands: Stopping checkpoint server')
 
 
 def start_remote_vlc_service(configfile):
@@ -125,7 +161,7 @@ def start_remote_vlc_service(configfile):
 	lg.info('Listening on %r:%r' %(config['vlc_client']['server']['ip'], config['vlc_client']['server']['port']))
 	ckpt = checkpoint(config['checkpoint_config'], runProcs)
 	vc = vlcRemoteColtroller(multiQ, ckpt, runThreads, runProcs)
-	vcThread = Thread(target=vc.instantiate, args=(config['user'], config['video_config']['path'], config['video_config']['ip'].split('/')[0], config['video_config']['port'], False))
+	vcThread = Thread(target=vc.instantiate, args=(config['user'], config['video_config']['path'], config['video_config']['ip'].split('/')[0], config['video_config']['port']))
 	vcThread.start()
 	ckptConsumerProcess = Process(target=ckpt.checkpoint, args=(checkpointingQ,))
 	ckptProviderThread = Thread(target=vc.checkpoint_enqueue, args=(checkpointingQ,))

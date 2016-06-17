@@ -45,7 +45,7 @@ class checkpoint():
 		cr = cnx.cursor()
 		cr.execute("select pos from seek where id='0_0'")
 		lastCheckpoint = cr.fetchone()
-		lg.debug('latest checkpoint fetched %s' %(lastCheckpoint))
+		lg.debug('getLatestCheckPoint: latest checkpoint fetched %s' %(lastCheckpoint))
 		cr.close()
 		cnx.close()
 		return lastCheckpoint[0]
