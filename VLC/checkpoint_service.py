@@ -48,4 +48,4 @@ class checkpoint():
 		lg.debug('latest checkpoint fetched %s' %(lastCheckpoint))
 		cr.close()
 		cnx.close()
-		return lastCheckpoint
+		return lastCheckpoint[0]
