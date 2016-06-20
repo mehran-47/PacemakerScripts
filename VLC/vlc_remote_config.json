@@ -1,19 +1,19 @@
 {
 	"user":"magic",
 	"video_config":{
-		"ip":"192.168.189.200/24",
+		"ip":"192.168.189.202/24",
 		"port":5544,
 		"dev":"eth0",
 		"user":"magic",
-		"path":"/opt/videos/kurzgezagt_safe_and_sorry.mp4"
+		"path":"/opt/videos/kurzgezagt_safe_and_sorry.mp4"		
 	},
 	"checkpoint_config":{
 		"server":{
-			"ip":"192.168.189.129",
+			"ip":"192.168.189.132",
 			"port":6677
 		},
 		"client":{
-			"ip":"192.168.189.129",
+			"ip":"192.168.189.132",
 			"port":5566	
 		},
 		"interval":5,
@@ -26,21 +26,22 @@
 	},
 	"rc_handle":{
 		"server":{
-			"ip":"192.168.189.129",
+			"ip":"192.168.189.132",
 			"port":6666
 		},
 		"client":{
-			"ip":"192.168.189.129",
+			"ip":"192.168.189.132",
 			"port":5555	
-		}
+		},
+		"interval":1
 	},
 	"vlc_client":{
 		"server":{
-			"ip":"192.168.189.139",
+			"ip":"192.168.189.132",
 			"port":6000
 		},
 		"client":{
-			"ip":"192.168.189.129",
+			"ip":"192.168.189.132",
 			"port":5000	
 		}
 	}

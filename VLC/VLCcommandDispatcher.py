@@ -32,7 +32,7 @@ if __name__ == '__main__':
 		'''
 		while True:
 			try:
-				client.send(msg)				
+				client.send(msg)
 			except KeyboardInterrupt:
 				shouldRun.clear()
 				lg.info('ending')

@@ -18,13 +18,9 @@ class checkpoint():
 	
 	def checkpoint(self, checkpointingQ):
 		'''
-		cnx = mysql.connector.connect(user='root', password='password', database='vlc_checkpoint')
-		cr = cnx.cursor()
-		cr.execute('update seek set pos=%s where id="0_0"' %(pp))
-		cnx.commit()
-		----------------
-		cr.close()
-		cnx.close()
+		Database name: vlc_checkpoint
+		Table name: seek
+		id: 0_0
 		'''
 		cnx = mysql.connector.connect(user=self.dbuser, password=self.dbpw, database=self.dbname)
 		cr = cnx.cursor()
@@ -45,7 +41,7 @@ class checkpoint():
 		cr = cnx.cursor()
 		cr.execute("select pos from seek where id='0_0'")
 		lastCheckpoint = cr.fetchone()
-		lg.debug('latest checkpoint fetched %s' %(lastCheckpoint))
+		lg.debug('getLatestCheckPoint: latest checkpoint fetched %s' %(lastCheckpoint))
 		cr.close()
 		cnx.close()
-		return lastCheckpoint
+		return lastCheckpoint[0]
