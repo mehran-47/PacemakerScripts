@@ -5,7 +5,7 @@
 		"port":5544,
 		"dev":"eth0",
 		"user":"magic",
-		"path":"/opt/videos/kurzgezagt_safe_and_sorry.mp4"
+		"path":"/opt/videos/kurzgezagt_safe_and_sorry.mp4"		
 	},
 	"checkpoint_config":{
 		"server":{
@@ -32,7 +32,8 @@
 		"client":{
 			"ip":"192.168.189.132",
 			"port":5555	
-		}
+		},
+		"interval":1
 	},
 	"vlc_client":{
 		"server":{
