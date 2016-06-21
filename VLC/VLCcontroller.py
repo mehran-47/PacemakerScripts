@@ -31,7 +31,9 @@ class vlcRemoteColtroller():
 			#video_config = {'user': config['user'] , 'path':config['video_config']['path'], 'ip':config['video_config']['ip'].split('/')[0], 'port':config['video_config']['port']}
 			self.instantiate_command = 'su '+ self.video_config['user'] +' -c "vlc -vvv '+  self.video_config['path'] + ' --sout \'#rtp{sdp=rtsp://' + self.video_config['ip'].split('/')[0] + ':' + str(self.video_config['port']) + '/rtest}\' --loop --ttl 1 -I rc"'
 			self.handle.sendline(self.instantiate_command)
-			if not self.isActive: self.handle.sendline('stop')
+			if not self.isActive: 
+				self.handle.sendline('stop')
+				with open('/tmp/vlc.state', 'w') as f: f.write('standby')
 			lg.info('vlc -vvv '+ self.video_config['path'] + ' --sout \'#rtp{sdp=rtsp://' + self.video_config['ip'].split('/')[0] + ':' +  str(self.video_config['port']) + '/rtest}\' --loop --ttl 1 -I rc')
 			self.monitorthread.start()
 			try:
@@ -117,19 +119,21 @@ class vlcRemoteColtroller():
 			lg.debug('set_streaming_ip: ip addr del ' +self.video_config['ip']+ ' dev '+self.video_config['dev'])
 
 	def set_active(self):
-		self.isActive = True
-		lastCkpt = self.ckpt.getLatestCheckPoint()
-		self.set_streaming_ip(True)
-		lg.debug('set_active: resuming from ' +str(lastCkpt))
-		self.resume_at(lastCkpt)
-		with open('/tmp/vlc.state','w') as f: f.write('active')
+		if not self.isActive:
+			self.isActive = True
+			lastCkpt = self.ckpt.getLatestCheckPoint()
+			self.set_streaming_ip(True)
+			lg.debug('set_active: resuming from ' +str(lastCkpt))
+			self.resume_at(lastCkpt)
+			with open('/tmp/vlc.state','w') as f: f.write('active')
 
 	def set_standby(self):
-		self.isActive = False
-		self.set_streaming_ip(False)
-		lg.debug('set_standby: stopping video-stream')
-		self.handle.sendline('stop')
-		with open('/tmp/vlc.state','w') as f: f.write('standby') 
+		if self.isActive:
+			self.isActive = False
+			self.set_streaming_ip(False)
+			lg.debug('set_standby: stopping video-stream')
+			self.handle.sendline('stop')
+			with open('/tmp/vlc.state','w') as f: f.write('standby') 
 
 	def checkpoint_enqueue(self, checkpointingQ):
 		while self.check_new_commands.is_set():

@@ -1,17 +1,22 @@
 #!/usr/bin/env python
 from connection import *
-import logging as lg, sys, json
+import logging as lg, sys, json, socket
 from multiprocessing import Event 
 
 def terminate_server_gracefully(config, ev=Event()):
-	time.sleep(5)
 	ev.set()
-	try:
-		client = connection(config['client']['ip'], config['client']['port'], ev)
-		client.connect(config['server']['ip'], config['server']['port'])
-	except socket.error:
-		lg.info('caught bad file descriptor exception')
-		client.close()
+	client = connection(config['client']['ip'], config['client']['port'], ev)
+	shouldLoop = True
+	while shouldLoop:
+		#timeour first for allowing VLCcontroller to terminate all scripts and processes
+		time.sleep(5)
+		try:
+			#client = connection(config['client']['ip'], config['client']['port'], ev)
+			client.connect(config['server']['ip'], config['server']['port'])
+		except socket.error:
+			lg.info('caught bad file descriptor exception')
+			shouldLoop=False
+	client.close()
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 {
 	"user":"magic",
+	"scripts_dir":"/home/magic/Documents/pacemakerScripts/VLC",
 	"video_config":{
 		"ip":"192.168.189.202/24",
 		"port":5544,
