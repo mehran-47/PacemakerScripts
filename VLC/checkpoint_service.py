@@ -29,9 +29,12 @@ class checkpoint():
 				self.seek = checkpointingQ.get()
 				lg.debug('from inside checkpointing service %r' %(self.seek))
 				with open(self.path+'/checkpoint', 'w') as cf: cf.write(self.seek)
-				lg.debug('############ update seek set pos=%r where id="0_0"' %(self.seek))
-				cr.execute('update seek set pos=%s where id="0_0"' %(self.seek))
-				cnx.commit()
+				try:
+					lg.debug('############ update seek set pos=%r where id="0_0"' %(self.seek))
+					cr.execute('update seek set pos=%s where id="0_0"' %(self.seek))
+					cnx.commit()
+				except mysql.connector.ProgrammingError:
+					lg.warning('Invalid character found in checkpoint: %r' %(self.seek))
 			time.sleep(self.interval)
 		cr.close()
 		cnx.close()

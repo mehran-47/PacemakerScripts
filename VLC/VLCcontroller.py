@@ -1,14 +1,13 @@
 #!/usr/bin/env python
-from pexpect import spawn
 from threading import Thread, Event as ThreadEvent
-import sys, os, logging as lg, time, json
+import sys, os, logging as lg, time, json, pexpect
 from multiprocessing import Pipe, Process, Queue, Event as ProcessEvent
 from connection import *
 from checkpoint_service import *
 
 class vlcRemoteColtroller():
-	def __init__(self, multiQ, checkpointHandle ,runThreads, runProcs, intervals):		
-		self.handle = spawn('bash', timeout=None)
+	def __init__(self, multiQ, checkpointHandle ,runThreads, runProcs, intervals, video_config):		
+		self.handle = pexpect.spawn('bash', timeout=None)
 		self.check_new_commands = runThreads
 		self.listen_for_commands = runProcs
 		self.commandstack = multiQ
@@ -16,6 +15,7 @@ class vlcRemoteColtroller():
 		self.command_exec_interval = 2
 		self.monitor_interval = intervals['monitor']
 		self.checkpoint_interval = intervals['checkpoint']
+		self.video_config = video_config
 		self.isActive = False
 		self.last10Lines = []
 		self.commands_executer = Thread(target=self.command_executer, name='command-executer')
@@ -24,13 +24,15 @@ class vlcRemoteColtroller():
 		self.ckpt = checkpointHandle
 		self.isResuming = Event()
 
-	def instantiate(self, user, path_to_video, ip, port):
-		if os.path.exists(path_to_video):		
+	def instantiate(self):
+		if os.path.exists(self.video_config['path']):		
 			lg.debug('command to play video:')
-			self.instantiate_command = 'su '+ user +' -c "vlc -vvv '+ path_to_video + ' --sout \'#rtp{sdp=rtsp://' + ip + ':' + str(port) + '/rtest}\' --loop --ttl 1 -I rc"'
+			#self.instantiate_command = 'su '+ user +' -c "vlc -vvv '+ path_to_video + ' --sout \'#rtp{sdp=rtsp://' + ip + ':' + str(port) + '/rtest}\' --loop --ttl 1 -I rc"'
+			#video_config = {'user': config['user'] , 'path':config['video_config']['path'], 'ip':config['video_config']['ip'].split('/')[0], 'port':config['video_config']['port']}
+			self.instantiate_command = 'su '+ self.video_config['user'] +' -c "vlc -vvv '+  self.video_config['path'] + ' --sout \'#rtp{sdp=rtsp://' + self.video_config['ip'].split('/')[0] + ':' + str(self.video_config['port']) + '/rtest}\' --loop --ttl 1 -I rc"'
 			self.handle.sendline(self.instantiate_command)
 			if not self.isActive: self.handle.sendline('stop')
-			lg.info('vlc -vvv '+ path_to_video + ' --sout \'#rtp{sdp=rtsp://' + ip + ':' + str(port) + '/rtest}\' --loop --ttl 1 -I rc')
+			lg.info('vlc -vvv '+ self.video_config['path'] + ' --sout \'#rtp{sdp=rtsp://' + self.video_config['ip'].split('/')[0] + ':' +  str(self.video_config['port']) + '/rtest}\' --loop --ttl 1 -I rc')
 			self.monitorthread.start()
 			try:
 				for line in self.handle: 
@@ -42,7 +44,7 @@ class vlcRemoteColtroller():
 				self.check_new_commands.clear()
 				self.handle.sendline('quit')
 		else:
-			lg.error('Invalid path to video: %s' %(path_to_video))
+			lg.error('Invalid path to video: %s' %(self.video_config['path']))
 	
 	def command_executer(self):
 		while self.check_new_commands.is_set():
@@ -52,6 +54,7 @@ class vlcRemoteColtroller():
 				lg.debug(self.last10Lines)
 				if aCommand.strip()=='terminate':
 					self.handle.sendline('quit')
+					self.set_streaming_ip(False)
 					self.check_new_commands.clear()
 					self.listen_for_commands.clear()
 					lg.info('Stopping vlc remote.')
@@ -105,14 +108,25 @@ class vlcRemoteColtroller():
 		self.handle.sendline('seek '+ str(resumeTime))
 		self.isResuming.clear()
 
+	def set_streaming_ip(self, toSet):
+		if toSet:
+			pexpect.run('ip addr add ' +self.video_config['ip']+ ' dev '+self.video_config['dev'])
+			lg.debug('set_streaming_ip: ip addr add ' +self.video_config['ip']+ ' dev '+self.video_config['dev'])
+		else:
+			pexpect.run('ip addr del ' +self.video_config['ip']+ ' dev '+self.video_config['dev'])
+			lg.debug('set_streaming_ip: ip addr del ' +self.video_config['ip']+ ' dev '+self.video_config['dev'])
+
 	def set_active(self):
 		self.isActive = True
 		lastCkpt = self.ckpt.getLatestCheckPoint()
-		lg.debug('command executer: resuming from ' +str(lastCkpt))
+		self.set_streaming_ip(True)
+		lg.debug('set_active: resuming from ' +str(lastCkpt))
 		self.resume_at(lastCkpt)
 
 	def set_standby(self):
 		self.isActive = False
+		self.set_streaming_ip(False)
+		lg.debug('set_standby: stopping video-stream')
 		self.handle.sendline('stop')
 
 	def checkpoint_enqueue(self, checkpointingQ):
@@ -169,8 +183,10 @@ def start_remote_vlc_service(configfile):
 	lg.info('Listening on %r:%r' %(config['vlc_client']['server']['ip'], config['vlc_client']['server']['port']))
 	ckpt = checkpoint(config['checkpoint_config'], runProcs)
 	intervals = {'monitor':config['rc_handle']['interval'], 'checkpoint':config['checkpoint_config']['interval']}
-	vc = vlcRemoteColtroller(multiQ, ckpt, runThreads, runProcs, intervals)
-	vcThread = Thread(target=vc.instantiate, args=(config['user'], config['video_config']['path'], config['video_config']['ip'].split('/')[0], config['video_config']['port']), name='VC-instantiate')
+	#video_config = {'user': config['user'] , 'path':config['video_config']['path'], 'ip':config['video_config']['ip'], 'port':config['video_config']['port']}
+	vc = vlcRemoteColtroller(multiQ, ckpt, runThreads, runProcs, intervals, config['video_config'])
+	#vcThread = Thread(target=vc.instantiate, args=(config['user'], config['video_config']['path'], config['video_config']['ip'].split('/')[0], config['video_config']['port']), name='VC-instantiate')
+	vcThread = Thread(target=vc.instantiate, name='VC-instantiate')
 	vcThread.start()
 	ckptConsumerProcess = Process(target=ckpt.checkpoint, args=(checkpointingQ,), name='checkpointing-consumer')
 	ckptProviderThread = Thread(target=vc.checkpoint_enqueue, args=(checkpointingQ,), name='checkpointing-provider')
