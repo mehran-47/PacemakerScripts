@@ -122,12 +122,14 @@ class vlcRemoteColtroller():
 		self.set_streaming_ip(True)
 		lg.debug('set_active: resuming from ' +str(lastCkpt))
 		self.resume_at(lastCkpt)
+		with open('/tmp/vlc.state','w') as f: f.write('active')
 
 	def set_standby(self):
 		self.isActive = False
 		self.set_streaming_ip(False)
 		lg.debug('set_standby: stopping video-stream')
 		self.handle.sendline('stop')
+		with open('/tmp/vlc.state','w') as f: f.write('standby') 
 
 	def checkpoint_enqueue(self, checkpointingQ):
 		while self.check_new_commands.is_set():
