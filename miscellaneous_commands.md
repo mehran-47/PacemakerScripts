@@ -13,3 +13,6 @@ crm resource stop <resource name>
 
 *show configuration
 crm configure show
+
+*one shot monitoring
+crm status
