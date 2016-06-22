@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from threading import Thread, Event as ThreadEvent
-import sys, os, logging as lg, time, json, pexpect
+import sys, os, logging as lg, time, json, pexpect, datetime
 from multiprocessing import Pipe, Process, Queue, Event as ProcessEvent
 from connection import *
 from checkpoint_service import *
@@ -147,13 +147,18 @@ class vlcRemoteColtroller():
 		while self.check_new_commands.is_set():
 			time.sleep(self.monitor_interval)
 			if not self.is_running():
+				detectionTime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
 				self.handle.sendline(self.instantiate_command)
 				if self.isActive: 					
 					lastCkpt = self.ckpt.getLatestCheckPoint()
 					lg.debug('monitor: resuming from ' +str(lastCkpt))
 					self.resume_at(lastCkpt)
+					recoveryTime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
+					with open('failureData/recoveryTime','w') as f: f.write(recoveryTime)
 				else:
 					self.handle.sendline('stop')
+				with open('failureData/detectionTime','w') as f: f.write(detectionTime)
+
 
 
 def server_recv_commands (child_pipe, multiQ, serverConn, runProcs):
